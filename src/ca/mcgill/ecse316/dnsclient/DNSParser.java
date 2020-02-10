@@ -75,16 +75,16 @@ public class DNSParser {
 				break;
 			
 			case "-mx":
-				if (DNSClient.queryType == QueryType.NameServer)
+				if (DNSClient.queryType == QueryType.NS)
 					 throw new InputSyntaxException("Only one of the mx/ns flags might be used");	
-				DNSClient.queryType = QueryType.MailServer;
+				DNSClient.queryType = QueryType.MX;
 				i++;
 				break;
 			
 			case "-ns":
-				if (DNSClient.queryType == QueryType.MailServer)
+				if (DNSClient.queryType == QueryType.MX)
 					 throw new InputSyntaxException("Only one of the mx/ns flags might be used");	
-				DNSClient.queryType = QueryType.NameServer;
+				DNSClient.queryType = QueryType.NS;
 				i++;
 				break;
 				

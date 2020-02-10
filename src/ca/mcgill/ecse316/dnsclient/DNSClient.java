@@ -6,7 +6,7 @@ public class DNSClient {
 	static int timeout = 5; // Timeout before retransmitting an answered query (in seconds)
 	static int maxRetries = 3; // # of retries to retransmit an answered query
 	static int port = 53; // UDP port number of the DNS server
-	static QueryType queryType = QueryType.TypeA; // Query can be mail server, name server or IP address (type A)
+	static QueryType queryType = QueryType.A; // Query can be mail server, name server or IP address (type A)
 	
 	static String dnsServerAddr; // DNS server IPv4 address
 	static String domName; // Domain name to query for
@@ -27,7 +27,11 @@ public class DNSClient {
 		System.out.println("query type: " + queryType.name());
 		System.out.println("dns addr: " + dnsServerAddr);
 		System.out.println("dom name: " + domName);
+		
+		
+		// Successful output
+		System.out.println("DnsClient sending request for " + domName);
+		System.out.println("Server: " + dnsServerAddr);
+		System.out.println("Request type: " + queryType.name());
 	}
-
-
 }
