@@ -60,6 +60,7 @@ public class DnsPacket {
 			Random rand = new Random();
 			rand.nextBytes(tempRandID);			// Generate random 16-bit ID
 			
+			
 			randID = tempRandID[0] << 8 | tempRandID[1];
 			fields[0] = (char) randID;
 			fields[1] = (char) (QR << QR_pos | OPCODE << OPCODE_pos | AA << AA_pos | TC << TC_pos
