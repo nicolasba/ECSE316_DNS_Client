@@ -3,7 +3,7 @@ package ca.mcgill.ecse316.dnsclient;
 import java.net.*;
 import java.io.*;
 
-import static ca.mcgill.ecse316.dnsclient.DNSClient.*;
+import static ca.mcgill.ecse316.dnsclient.DnsClient.*;
 import static ca.mcgill.ecse316.dnsclient.SocketClient.*;
 
 
