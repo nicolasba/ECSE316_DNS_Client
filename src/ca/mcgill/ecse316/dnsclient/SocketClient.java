@@ -9,14 +9,18 @@ import static ca.mcgill.ecse316.dnsclient.SocketServer.*;
 public class SocketClient {
 
     public static void manageSocket() throws Exception {
-        DatagramSocket clientSocket =  new DatagramSocket();
+        DatagramSocket clientSocket =  new DatagramSocket(55784);
+       
         InetAddress ipAddress = InetAddress.getByName(domName);
         InetAddress localIp = InetAddress.getLocalHost();
 
 
-        InetAddress temp = InetAddress.getByName(dnsServerAddr);
+        InetAddress temp = InetAddress.getByAddress(dnsServerAddrBytes);
+        
+        System.out.println("addr bytes: " + dnsServerAddrBytes[0] + dnsServerAddrBytes[1]
+        		+ dnsServerAddrBytes[2] + dnsServerAddrBytes[3]);
 
-        clientSocket.setSoTimeout(5);
+        clientSocket.setSoTimeout(timeout * 1000);
         //clientSocket.setSoTimeout(timeout);
 //        System.out.println(clientSocket);
 //        System.out.println(ipAddress);
@@ -30,7 +34,7 @@ public class SocketClient {
 //                new BufferedReader(new InputStreamReader(System.in));
 //        String sentence = inFromUser.readLine();
 //        sendData = sentence.getBytes(); //write what you want to send
-         String sentence = "test i just want this program to work";
+         String sentence = "te\0\0\0\0";
          sendData = sentence.getBytes();
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +42,7 @@ public class SocketClient {
         DatagramPacket sendIt = new DatagramPacket(sendData, sendData.length, temp, port);
         clientSocket.send(sendIt);
         System.out.println("send it is: " + sendIt);
-
+        System.out.println("local port: " + clientSocket.getLocalPort());
        // clientSocket.close();
 
         //problem here

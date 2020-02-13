@@ -1,12 +1,37 @@
 package ca.mcgill.ecse316.dnsclient;
 
+import java.nio.ByteBuffer;
+
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
 
 public class DnsPacket {
+
+	ByteBuffer buffer;
 	
-	private DnsPacketHeader header = new DnsPacketHeader();
+	private DnsPacketHeader header;
+	private DnsPacketQuestion question;
+	
+	//Constructor used for request packets
+	public DnsPacket(){
+		
+		header = new DnsPacketHeader();
+		question = new DnsPacketQuestion();
+		
+		//buffer.put(answer.buffer);
+		buffer.put(question.buffer);
+	}
+	
+	//Constructor used for response packets
+	public DnsPacket(ByteBuffer response) {
+		
+		header = new DnsPacketHeader(response);
+		//Test position changes TODO !!!!!!
+		question = new DnsPacketQuestion(response);
+	}
+	
 	
 	public DnsPacketHeader make() {	
 		
@@ -14,9 +39,9 @@ public class DnsPacket {
 	}
 	
 	
-	private class DnsPacketHeader{		
+	private class DnsPacketHeader {		
 		
-		char fields[];			
+		ByteBuffer buffer;
 		
 		//First field
 		int randID;			
@@ -31,15 +56,6 @@ public class DnsPacket {
 		int Z;					// Does not mean anything
 		int RCODE;				// Error codes
 		
-		int QR_pos = 15;
-		int OPCODE_pos = 11;			
-		int AA_pos = 10;
-		int TC_pos = 9;
-		int RD_pos = 8;
-		int RA_pos = 7;
-		int Z_pos = 4;
-		int RCODE_pos = 0;
-		
 		//3rd-6th fields
 		int QDCOUNT;			// Number of entries in the Question section
 		int ANCOUNT;			// Number of resource records (RRs) in the Answer section
@@ -50,7 +66,7 @@ public class DnsPacket {
 		DnsPacketHeader(){
 			
 			//Request packet values
-			fields = new char[6];				// A DNS packet header contains 6 16-bit field
+			buffer = ByteBuffer.allocate(12);		// A DNS packet header contains 12 8-bit fields
 			QR = OPCODE = AA = TC = RA = Z = RCODE = 0;
 			RD = 1;
 			QDCOUNT = 1;
@@ -59,43 +75,101 @@ public class DnsPacket {
 			byte[] tempRandID = new byte[2];	// Id must be random 16-bit number (byte is 8 bits long)
 			Random rand = new Random();
 			rand.nextBytes(tempRandID);			// Generate random 16-bit ID
+			randID = Byte.toUnsignedInt(tempRandID[0]) << 8 |  Byte.toUnsignedInt(tempRandID[1]);
 			
+			byte[] last3Rows = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 			
-			randID = tempRandID[0] << 8 | tempRandID[1];
-			fields[0] = (char) randID;
-			fields[1] = (char) (QR << QR_pos | OPCODE << OPCODE_pos | AA << AA_pos | TC << TC_pos
-					| RD << RD_pos | RA << RA_pos | Z << Z_pos | RCODE << RCODE_pos);
-			fields[2] = (char) QDCOUNT;
-			fields[3] = (char) ANCOUNT;
-			fields[4] = (char) NSCOUNT;
-			fields[5] = (char) ARCOUNT;
+			buffer.put(tempRandID[0]);
+			buffer.put(tempRandID[1]);
+			
+			buffer.put((byte)0x01);		//2nd row header
+			buffer.put((byte)0x00);
+			
+			buffer.put((byte)0x00);		//QDCOUNT
+			buffer.put((byte)0x01);
+			
+			buffer.put(last3Rows);		//Other counts
+			
+			//Need to flip (to set limit) so that buffers can be concatenated into one final buffer
+			buffer.flip();		
 		}
 		
 		//Constructor to instantiate response packet headers (parsing done according to DNS protocol)
-		DnsPacketHeader(char[] response_fields){
+		DnsPacketHeader(ByteBuffer response){
 			
-			fields = Arrays.copyOf(response_fields, response_fields.length);
+			buffer = response;
 			
 			//First field
-			randID = fields[0];
-			
-			//Second field
-			QR = ((0x1 << QR_pos) & fields[1]) >> QR_pos;
-			OPCODE = ((0xF << OPCODE_pos) & fields[1]) >> OPCODE_pos;
-			AA = ((0x1 << AA_pos) & fields[1]) >> AA_pos;
-			TC = ((0x1 << TC_pos) & fields[1]) >> TC_pos;
-			RD = ((0x1 << RD_pos) & fields[1]) >> RD_pos;
-			RA = ((0x1 << RA_pos) & fields[1]) >> RA_pos;
-			Z = ((0x7 << Z_pos) & fields[1]) >> Z_pos;
-			RCODE = ((0xF << RCODE_pos) & fields[1]) >> RCODE_pos;
+			randID = buffer.getChar();
+//			randID = Byte.toUnsignedInt(buffer.get()) << 8 |  Byte.toUnsignedInt(fields[1]);
+
+			//Second row  (Do logical shift right instead of arithmetic)
+			byte lefthalf = buffer.get();
+			byte righthalf = buffer.get();
+			QR = ((0x1 << 7) & lefthalf) >>> 7;
+			OPCODE = ((0xF << 3) & lefthalf) >>> 3;
+			AA = ((0x1 << 2) & lefthalf) >>> 2;
+			TC = ((0x1 << 1) & lefthalf) >>> 1;
+			RD = 0x1 & lefthalf;
+			RA = ((0x1 << 7) & righthalf) >>> 7;
+			Z = ((0x7 << 4) & righthalf) >>> 4;
+			RCODE = 0xF & righthalf;
 			
 			//3rd-6th fields
-			QDCOUNT = fields[2];
-			ANCOUNT = fields[3];
-			NSCOUNT = fields[4];
-			ARCOUNT = fields[5];
+			QDCOUNT = buffer.getChar();
+			ANCOUNT = buffer.getChar();
+			NSCOUNT = buffer.getChar();
+			ARCOUNT = buffer.getChar();
 		}
 		
 	}
-
+	
+	private class DnsPacketQuestion {
+		
+		ByteBuffer buffer;
+		
+		//Request
+		public DnsPacketQuestion() {
+			
+			buffer = ByteBuffer.allocate(1024);	
+			
+			//Number of labels in domain name. Ex: 3 labels in "www.mcgill.ca"
+			int domNameLabelsLength = DnsClient.domNameLabels.length;
+			
+			for (int i = 0; i < domNameLabelsLength; i++) {
+				byte[] labelChars = DnsClient.domNameLabels[i].getBytes();
+				buffer.put((byte) labelChars.length);	// Store number of character in label first
+				buffer.put(labelChars);					// Store sequence of characters
+			}
+			
+			buffer.put((byte)0x0);		// End of QNAME
+			
+			// Store QTYPE 16-bit code
+			switch (DnsClient.queryType) {
+			case A: 
+				buffer.putChar((char)0x0001);
+				break;
+			case NS:
+				buffer.putChar((char)0x000f);
+				break;
+			case MX:
+				buffer.putChar((char)0x0002);
+				break;
+			}
+			
+			// Store QCLASS = 1 (Internet)
+			buffer.putChar((char)0x0001);
+		}
+		
+		//Response 
+		public DnsPacketQuestion(ByteBuffer response) {
+			
+		}
+		
+	}
+	
+	private class DnsPacketAnswer {
+		
+		ByteBuffer buffer;
+	}
 }

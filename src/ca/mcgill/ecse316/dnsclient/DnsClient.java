@@ -1,7 +1,5 @@
 package ca.mcgill.ecse316.dnsclient;
 
-import java.io.PrintStream;
-
 public class DnsClient {
 	
 	// Default flag values
@@ -13,17 +11,38 @@ public class DnsClient {
 	DnsPacket packet = new DnsPacket();
 	
 	static String dnsServerAddr; // DNS server IPv4 address
+	static byte[] dnsServerAddrBytes; //DNS server IPv4 address without '.'
 	static String domName; // Domain name to query for
+	static String[] domNameLabels;
 
 	public static void main(String[] args) {
 		
+		dnsServerAddr = "";
+		dnsServerAddrBytes = new byte[4];
+		domName = "";
+		
 		try {
 			DnsParser.parse(args);
+//			SocketClient.manageSocket();
 		}
 		catch (Exception e) {
 			System.out.println("ERROR\t" + e.getMessage());
 			System.exit(1);
 		}
+		
+		byte[] temp = {(byte)255, 21, 3, 1, 0, 55, 100, 56, 32, 40, 30};		
+		printHexDump(temp);
+		
+		byte [] id = {(byte) 0xFF, (byte) 0xFF};
+		int id2 = Byte.toUnsignedInt(id[0]) << 8 | Byte.toUnsignedInt(id[1]);
+		System.out.println(String.format("id: 0x%08X", id2));
+		
+		byte b = (byte) 0xFF;
+		int d = (int) b;
+		int c = Byte.toUnsignedInt(b);
+		System.out.println(String.format("b: 0x%08X",  c << 8));
+	
+		System.out.println(c);
 		
 		System.out.println("timeout : " + timeout);
 		System.out.println("max retries : " + maxRetries);
@@ -32,9 +51,30 @@ public class DnsClient {
 		System.out.println("dns addr: " + dnsServerAddr);
 		System.out.println("dom name: " + domName);
 		
+		System.out.print("dom name labels: " );
+		for (String i : domNameLabels)
+			System.out.print(i + " ");
+		System.out.println();
+		
 		// Successful output
 		System.out.println("DnsClient sending request for " + domName);
 		System.out.println("Server: " + dnsServerAddr);
 		System.out.println("Request type: " + queryType.name());
+	}
+	
+	public static void printHexDump(byte [] data) {
+		
+		System.out.println("-------------");
+		System.out.println("Hex dump :");
+		for (int i = 0; i < data.length; i++) {
+			System.out.print(String.format("0x%02X ", data[i]));
+			
+			if ((i+1) % 10 == 0)
+				System.out.println();
+		}
+		System.out.println();
+		System.out.println("-------------");
+		System.out.println();
+		
 	}
 }

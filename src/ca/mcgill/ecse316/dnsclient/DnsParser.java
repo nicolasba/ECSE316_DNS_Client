@@ -2,6 +2,8 @@ package ca.mcgill.ecse316.dnsclient;
 
 import java.util.Arrays;
 
+import javax.xml.bind.DatatypeConverter;
+
 public class DnsParser {
 	
 	public static void parse(String[] args) throws Exception {
@@ -27,7 +29,10 @@ public class DnsParser {
 		
 		for (int i = 0; i < 4; i++) {
 			try {
-				Integer.valueOf(tempDnsAddr[i]);				
+				int temp = Integer.valueOf(tempDnsAddr[i]);
+				if (temp > 255) throw new InputSyntaxException("Incorrect DNS server address");
+				//Convert from unsigned to signed (byte datatype is signed)
+				DnsClient.dnsServerAddrBytes[i] = (temp > 127) ? (byte) (temp - 256): (byte)temp;			
 			}
 			catch (Exception e) {
 				throw new InputSyntaxException("Incorrect DNS server address");
@@ -36,6 +41,7 @@ public class DnsParser {
 
 		// Last argument is domain name
 		DnsClient.domName = args[args.length - 1];
+		DnsClient.domNameLabels = DnsClient.domName.split("\\.");
 		
 		// Parse optional flags
 		if (args.length > 2) 
@@ -93,5 +99,4 @@ public class DnsParser {
 			}
 		}
 	}
-
 }
