@@ -8,8 +8,8 @@ import static ca.mcgill.ecse316.dnsclient.SocketServer.*;
 
 public class SocketClient {
 
-    public static void manageSocket() throws Exception {
-        DatagramSocket clientSocket =  new DatagramSocket(55784);
+    public static void manageSocket(byte[] sendData) throws Exception {
+        DatagramSocket clientSocket =  new DatagramSocket();
        
         InetAddress ipAddress = InetAddress.getByName(domName);
         InetAddress localIp = InetAddress.getLocalHost();
@@ -25,7 +25,6 @@ public class SocketClient {
 //        System.out.println(clientSocket);
 //        System.out.println(ipAddress);
 
-        byte[] sendData = new byte[1024];
         byte[] receiveData = new byte[1024];
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -34,8 +33,8 @@ public class SocketClient {
 //                new BufferedReader(new InputStreamReader(System.in));
 //        String sentence = inFromUser.readLine();
 //        sendData = sentence.getBytes(); //write what you want to send
-         String sentence = "te\0\0\0\0";
-         sendData = sentence.getBytes();
+//         String sentence = "te\0\0\0\0";
+//         sendData = sentence.getBytes();
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -63,6 +62,8 @@ public class SocketClient {
         }
 //        serverSocket.close();
         System.out.println("hello "+ receive1.getAddress());
+        System.out.println("hex dump response packet: ");
+        DnsClient.printHexDump(receive1.getData());
 
 
 

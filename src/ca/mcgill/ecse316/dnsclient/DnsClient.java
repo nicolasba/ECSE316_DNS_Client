@@ -8,7 +8,7 @@ public class DnsClient {
 	static int port = 53; // UDP port number of the DNS server
 	static QueryType queryType = QueryType.A; // Query can be mail server, name server or IP address (type A)
 	
-	DnsPacket packet = new DnsPacket();
+	static DnsPacket packet;
 	
 	static String dnsServerAddr; // DNS server IPv4 address
 	static byte[] dnsServerAddrBytes; //DNS server IPv4 address without '.'
@@ -23,15 +23,16 @@ public class DnsClient {
 		
 		try {
 			DnsParser.parse(args);
-//			SocketClient.manageSocket();
+			packet = new DnsPacket();
+			SocketClient.manageSocket(packet.message);
 		}
 		catch (Exception e) {
 			System.out.println("ERROR\t" + e.getMessage());
 			System.exit(1);
 		}
-		
-		byte[] temp = {(byte)255, 21, 3, 1, 0, 55, 100, 56, 32, 40, 30};		
-		printHexDump(temp);
+				
+		System.out.println("hex dump request packet:");
+		printHexDump(packet.message);
 		
 		byte [] id = {(byte) 0xFF, (byte) 0xFF};
 		int id2 = Byte.toUnsignedInt(id[0]) << 8 | Byte.toUnsignedInt(id[1]);
