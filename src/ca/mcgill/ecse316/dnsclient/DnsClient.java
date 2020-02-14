@@ -1,5 +1,6 @@
 package ca.mcgill.ecse316.dnsclient;
 
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 
 public class DnsClient {
@@ -18,6 +19,9 @@ public class DnsClient {
 	static String domName; // Domain name to query for
 	static String[] domNameLabels;
 
+	static int nbAttempts; // Keep track of the # of request attempts
+	static boolean didReceive = false;
+
 	public static void main(String[] args) {
 
 		dnsServerAddr = "";
@@ -26,13 +30,34 @@ public class DnsClient {
 		byte[] responseData = new byte[1024];
 
 		try {
-			DnsParser.parse(args);
-			requestPacket = new DnsPacket();
-			responseData = SocketClient.sendPacket(requestPacket.message);
-			responsePacket = new DnsPacket(ByteBuffer.wrap(responseData));
+			DnsParser.parse(args); // Parse user input
 		} catch (Exception e) {
 			System.out.println("ERROR\t" + e.getMessage());
 			System.exit(1);
+		}
+
+		for (nbAttempts = 0; nbAttempts < maxRetries && !didReceive; nbAttempts++) {
+
+			System.out.println("Attempt " + (nbAttempts + 1) + " out of " + maxRetries);
+			System.out.println("Sending request ...");
+
+			try {
+				requestPacket = new DnsPacket();
+				responseData = SocketClient.sendPacket(requestPacket.message);
+				responsePacket = new DnsPacket(ByteBuffer.wrap(responseData));	//Will throw exception if no response
+				didReceive = true;		//If we get to this point, we received a response
+			} catch (SocketTimeoutException timeoutEx) {
+
+				if (nbAttempts + 1 == maxRetries) {
+					System.out.println("ERROR Server not responding");
+					System.exit(1);
+				}
+
+			} catch (Exception e) {
+				System.out.println("ERROR\t" + e.getMessage());
+				System.exit(1);
+			}
+
 		}
 
 		System.out.println("\nHex dump request packet:");
@@ -40,6 +65,13 @@ public class DnsClient {
 
 		System.out.println("\nHex dump response packet:");
 		printHexDump(responseData);
+		
+		System.out.println("timeout : " + timeout);
+		System.out.println("max retries : " + maxRetries);
+		System.out.println("port : " + port);
+		System.out.println("query type: " + queryType.name());
+		System.out.println("dns addr: " + dnsServerAddr);
+		System.out.println("dom name: " + domName);
 
 		System.out.println("id: " + responsePacket.header.randID);
 		System.out.println("QR: " + responsePacket.header.QR);
@@ -98,19 +130,7 @@ public class DnsClient {
 			System.out.println("EXCHANGE: " + responsePacket.additional.rrs[i].EXCHANGE);
 			System.out.println();
 		}
-
-//		System.out.println("timeout : " + timeout);
-//		System.out.println("max retries : " + maxRetries);
-//		System.out.println("port : " + port);
-//		System.out.println("query type: " + queryType.name());
-//		System.out.println("dns addr: " + dnsServerAddr);
-//		System.out.println("dom name: " + domName);
-
-//		System.out.print("dom name labels: " );
-//		for (String i : domNameLabels)
-//			System.out.print(i + " ");
-//		System.out.println();
-
+		
 		// Successful output
 //		System.out.println("DnsClient sending request for " + domName);
 //		System.out.println("Server: " + dnsServerAddr);

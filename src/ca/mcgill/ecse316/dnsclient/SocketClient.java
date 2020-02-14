@@ -12,26 +12,19 @@ public class SocketClient {
 		DatagramSocket clientSocket = new DatagramSocket();
 		InetAddress dnsServerIPAddr = InetAddress.getByAddress(dnsServerAddrBytes);
 
-		clientSocket.setSoTimeout(timeout * 1000);
-		System.out.println("tmp: " + dnsServerIPAddr);
+		clientSocket.setSoTimeout(timeout * 1000);		//Set timeout in ms
+		System.out.println("dns server ip addr: " + dnsServerIPAddr);
 
 		DatagramPacket requestPacket = new DatagramPacket(sendData, sendData.length, dnsServerIPAddr, port);
 		clientSocket.send(requestPacket);
-		System.out.println("local port: " + clientSocket.getLocalPort());
 
 		DatagramPacket responsePacket = new DatagramPacket(receiveData, receiveData.length);
-
-		try {
-			clientSocket.receive(responsePacket);
-		} catch (Exception e) {
-			System.out.println(e);
-		}
+		clientSocket.receive(responsePacket);
 
 		System.out.println("hello " + responsePacket.getAddress());
 		System.out.println("Server says: " + new String(responsePacket.getData()));
 		
 		clientSocket.close();
 		return responsePacket.getData();
-
 	}
 }

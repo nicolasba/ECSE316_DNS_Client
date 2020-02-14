@@ -35,11 +35,8 @@ public class DnsPacket {
 	public DnsPacket(ByteBuffer response) {
 
 		// The values from each section will be stored in their corresponding instances
-		System.out.println("position before header: " + response.position());
 		header = new DnsPacketHeader(response);
-		System.out.println("position after header: " + response.position());
 		question = new DnsPacketQuestion(response);
-		System.out.println("position after question: " + response.position());
 		answer = new DnsPacketAnswer(response, 0);
 		auth = new DnsPacketAnswer(response, 1);
 		additional = new DnsPacketAnswer(response, 2);
