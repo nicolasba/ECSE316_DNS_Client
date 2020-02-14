@@ -10,11 +10,11 @@ public class DnsPacket {
 	ByteBuffer buffer;
 	byte[] message;
 
-	private DnsPacketHeader header;
-	private DnsPacketQuestion question;
-	private DnsPacketAnswer answer;
-	private DnsPacketAnswer auth;
-	private DnsPacketAnswer additional;
+	DnsPacketHeader header;
+	DnsPacketQuestion question;
+	DnsPacketAnswer answer;
+	DnsPacketAnswer auth;
+	DnsPacketAnswer additional;
 
 	// Constructor used for request packets
 	public DnsPacket() {
@@ -23,25 +23,31 @@ public class DnsPacket {
 		header = new DnsPacketHeader();
 		question = new DnsPacketQuestion();
 
-		//Concatenate byte buffers from header and question section
+		// Concatenate byte buffers from header and question section
 		buffer.put(header.buffer);
 		buffer.put(question.buffer);
-		
-		//Get byte[] from byte buffer
+
+		// Get byte[] from byte buffer
 		message = Arrays.copyOf(buffer.array(), buffer.position());
 	}
 
 	// Constructor used for response packets
 	public DnsPacket(ByteBuffer response) {
 
+		// The values from each section will be stored in their corresponding instances
+		System.out.println("position before header: " + response.position());
 		header = new DnsPacketHeader(response);
-		// Test position changes TODO !!!!!!
+		System.out.println("position after header: " + response.position());
 		question = new DnsPacketQuestion(response);
+		System.out.println("position after question: " + response.position());
+		answer = new DnsPacketAnswer(response, 0);
+		auth = new DnsPacketAnswer(response, 1);
+		additional = new DnsPacketAnswer(response, 2);
 	}
-	
+
 	/************************** PACKET HEADER **************************/
 
-	private class DnsPacketHeader {
+	 class DnsPacketHeader {
 
 		ByteBuffer buffer;
 
@@ -129,13 +135,13 @@ public class DnsPacket {
 	}
 
 	/************************** PACKET QUESTION SECTION **************************/
-	
-	private class DnsPacketQuestion {
+
+	 class DnsPacketQuestion {
 
 		ByteBuffer buffer;
 
 		// Request
-		public DnsPacketQuestion() {
+		DnsPacketQuestion() {
 
 			buffer = ByteBuffer.allocate(1024);
 
@@ -169,8 +175,8 @@ public class DnsPacket {
 			buffer.flip();
 		}
 
-		// Request (Ignore the data from this section in response message)
-		public DnsPacketQuestion(ByteBuffer response) {
+		// Response (Ignore the data from this section in response message)
+		DnsPacketQuestion(ByteBuffer response) {
 
 			buffer = response;
 
@@ -179,21 +185,163 @@ public class DnsPacket {
 
 			for (int i = 0; i < domNameLabelsLength; i++) {
 				byte[] labelChars = DnsClient.domNameLabels[i].getBytes();
-				buffer.get(); // Remove number of character in label
-				for (int j = 0; j < labelChars.length; j++)
-					buffer.get(); // Remove sequence of characters
+				buffer.get(); // Remove number of characters in label
+				buffer.get(new byte[labelChars.length]); // Remove sequence of characters
 			}
 
 			buffer.get(); // End of QNAME
 
-			buffer.getChar(); 	//Remove QTYPE
-			buffer.getChar();	//Remove QCLASS
+			buffer.getChar(); // Remove QTYPE
+			buffer.getChar(); // Remove QCLASS
 		}
 
 	}
 
-	private class DnsPacketAnswer {
+	/**************** PACKET ANSWER (ANS/AUTH/ADD) SECTION ****************/
+
+	 class DnsPacketAnswer {
 
 		ByteBuffer buffer;
+		int nbRecords; // # of RRs in this answer
+		DnsPacketAnswerRR[] rrs;
+
+		// This section is only relevant for response packets
+		DnsPacketAnswer(ByteBuffer response, int answerType) {
+
+			buffer = response;
+
+			if (answerType == 0)
+				nbRecords = header.ANCOUNT; // # of RRs in Answer
+			else if (answerType == 1)
+				nbRecords = header.NSCOUNT; // # of RRs in Authority
+			else if (answerType == 2)
+				nbRecords = header.ARCOUNT; // # of RRs in Additional
+
+			rrs = new DnsPacketAnswerRR[nbRecords];
+			
+			for (int i = 0; i < nbRecords; i++) {
+
+				rrs[i] = new DnsPacketAnswerRR();
+				parseLabels(response, rrs[i], "NAME");
+
+				rrs[i].TYPE = response.getChar();
+				rrs[i].CLASS = response.getChar();
+				rrs[i].TTL = ((long) response.getChar()) << 16 | response.getChar();
+				rrs[i].RDLENGTH = response.getChar();
+
+				// RDATA for TYPE A is an IPv4 address
+				if (rrs[i].TYPE == 0x0001) {
+
+					rrs[i].RDATA += Byte.toUnsignedInt(response.get());
+					rrs[i].RDATA += ".";
+					rrs[i].RDATA += Byte.toUnsignedInt(response.get());
+					rrs[i].RDATA += ".";
+					rrs[i].RDATA += Byte.toUnsignedInt(response.get());
+					rrs[i].RDATA += ".";
+					rrs[i].RDATA += Byte.toUnsignedInt(response.get());
+
+				} else if (rrs[i].TYPE == 0x0002) { // RDATA for NS is a sequence of labels
+					parseLabels(response, rrs[i], "RDATA");
+
+				} else if (rrs[i].TYPE == 0x0005) { // RDATA for CNAME is a sequence of labels
+					parseLabels(response, rrs[i], "RDATA");
+
+				} else if (rrs[i].TYPE == 0x000F) { // RDATA for MX is a sequence of labels
+					rrs[i].PREFERENCE += response.getChar();
+					parseLabels(response, rrs[i], "EXCHANGE");
+				}
+			}
+		}
+
+		void parseLabels(ByteBuffer response, DnsPacketAnswerRR rr, String s) {
+
+			// First byte indicates length of label
+			byte nbLabelChars = response.get();
+			boolean foundPointer = false;
+			int positionAfterPointer = 0;
+
+			// As long as we haven't encountered 0x0, we have to keep reading labels
+			while (nbLabelChars != 0) {
+				
+				//Found compression pointer
+				if (nbLabelChars < 0) {
+					
+					//Go back 1 byte to read 2 bytes containing the offset
+					response.position(response.position() - 1); 
+					
+					int offset = response.getChar();
+					offset = offset & 0x3FFF;		//Only consider the last 14 bits from the 2 bytes
+					
+					//Keep track of position after pointer (only after the first pointer encountered, 
+					//there can be nested pointers)
+					if (!foundPointer)
+						positionAfterPointer = response.position(); 
+					
+					foundPointer = true;
+					
+					response.position(offset);	//Reposition the buffer to the offset
+					nbLabelChars = response.get();
+				}
+
+				byte[] labelBytes = new byte[nbLabelChars];
+				response.get(labelBytes);
+
+				switch (s) {
+				case "NAME":
+					// Concatenate labels to NAME field in RR
+					rr.NAME += new String(labelBytes);
+					rr.NAME += ".";
+					break;
+				case "RDATA":
+					// Concatenate labels to RDATA field in RR
+					rr.RDATA += new String(labelBytes);
+					rr.RDATA += ".";
+					break;
+				case "EXCHANGE":
+					// Concatenate labels to EXCHANGE field in RR
+					rr.EXCHANGE += new String(labelBytes);
+					rr.EXCHANGE += ".";
+					break;
+				}
+
+				nbLabelChars = response.get();
+			}
+			
+			if (foundPointer)
+				response.position(positionAfterPointer);
+
+			// Remove last '.'
+			switch (s) {
+			case "NAME":
+				rr.NAME = rr.NAME.substring(0, rr.NAME.length() - 1);
+				break;
+			case "RDATA":
+				rr.RDATA = rr.RDATA.substring(0, rr.RDATA.length() - 1);
+				break;
+			case "EXCHANGE":
+				rr.EXCHANGE = rr.EXCHANGE.substring(0, rr.EXCHANGE.length() - 1);
+				break;
+			}
+
+		}
+	}
+
+	 class DnsPacketAnswerRR {
+
+		String NAME = ""; // Domain name associated with RR
+		int TYPE = 0; // Type of data in RDATA (0x1 typeA, 0x0002 NS, 0x0005 CNAME, 0x000f MX)
+		int CLASS = 0; // Similar to QCODE in Question section (should be 0x1, if not ERROR)
+		long TTL = 0; // How long (in seconds) this RR may be cached
+		int RDLENGTH = 0; // Length of RDATA in bytes
+
+		// Describes resource (TypeA: IPv4 address (4 octets), NS and CNAME: sequence of
+		// labels,
+		// MX: PREFERENCE AND EXCHANGE)
+		String RDATA = "";
+
+		// Only relevant for MX TYPE (mail server)
+		int PREFERENCE = 0; // Preference given to this RR
+		String EXCHANGE = ""; // Domain name of mail server (as sequence of labels)
+
 	}
 }

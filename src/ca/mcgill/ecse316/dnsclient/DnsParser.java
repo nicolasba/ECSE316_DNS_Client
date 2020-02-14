@@ -2,8 +2,6 @@ package ca.mcgill.ecse316.dnsclient;
 
 import java.util.Arrays;
 
-import javax.xml.bind.DatatypeConverter;
-
 public class DnsParser {
 	
 	public static void parse(String[] args) throws Exception {

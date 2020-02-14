@@ -1,78 +1,37 @@
 package ca.mcgill.ecse316.dnsclient;
 
 import java.net.*;
-import java.io.*;
-
 import static ca.mcgill.ecse316.dnsclient.DnsClient.*;
-import static ca.mcgill.ecse316.dnsclient.SocketServer.*;
 
 public class SocketClient {
 
-    public static void manageSocket(byte[] sendData) throws Exception {
-        DatagramSocket clientSocket =  new DatagramSocket();
-       
-        InetAddress ipAddress = InetAddress.getByName(domName);
-        InetAddress localIp = InetAddress.getLocalHost();
+	public static byte[] sendPacket(byte[] sendData) throws Exception {
 
+		byte[] receiveData = new byte[1024];
 
-        InetAddress temp = InetAddress.getByAddress(dnsServerAddrBytes);
-        
-        System.out.println("addr bytes: " + dnsServerAddrBytes[0] + dnsServerAddrBytes[1]
-        		+ dnsServerAddrBytes[2] + dnsServerAddrBytes[3]);
+		DatagramSocket clientSocket = new DatagramSocket();
+		InetAddress dnsServerIPAddr = InetAddress.getByAddress(dnsServerAddrBytes);
 
-        clientSocket.setSoTimeout(timeout * 1000);
-        //clientSocket.setSoTimeout(timeout);
-//        System.out.println(clientSocket);
-//        System.out.println(ipAddress);
+		clientSocket.setSoTimeout(timeout * 1000);
+		System.out.println("tmp: " + dnsServerIPAddr);
 
-        byte[] receiveData = new byte[1024];
+		DatagramPacket requestPacket = new DatagramPacket(sendData, sendData.length, dnsServerIPAddr, port);
+		clientSocket.send(requestPacket);
+		System.out.println("local port: " + clientSocket.getLocalPort());
 
-//////////////////////////////////////////////////////////////////////////////////////////
-        System.out.println("tmp: " +temp);
-//        BufferedReader inFromUser =
-//                new BufferedReader(new InputStreamReader(System.in));
-//        String sentence = inFromUser.readLine();
-//        sendData = sentence.getBytes(); //write what you want to send
-//         String sentence = "te\0\0\0\0";
-//         sendData = sentence.getBytes();
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
+		DatagramPacket responsePacket = new DatagramPacket(receiveData, receiveData.length);
 
+		try {
+			clientSocket.receive(responsePacket);
+		} catch (Exception e) {
+			System.out.println(e);
+		}
 
-        DatagramPacket sendIt = new DatagramPacket(sendData, sendData.length, temp, port);
-        clientSocket.send(sendIt);
-        System.out.println("send it is: " + sendIt);
-        System.out.println("local port: " + clientSocket.getLocalPort());
-       // clientSocket.close();
+		System.out.println("hello " + responsePacket.getAddress());
+		System.out.println("Server says: " + new String(responsePacket.getData()));
+		
+		clientSocket.close();
+		return responsePacket.getData();
 
-        //problem here
-        DatagramPacket receive1 = new DatagramPacket(receiveData,receiveData.length);
-        //DatagramSocket serverSocket = new DatagramSocket(port);
-
-//     serverSocket.setSoTimeout(5);
-//        try {
-//            serverSocket();
-//        } catch (Exception e) {
-//            System.out.println(e);
-//        }
-
-        try{
-            clientSocket.receive(receive1);
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-//        serverSocket.close();
-        System.out.println("hello "+ receive1.getAddress());
-        System.out.println("hex dump response packet: ");
-        DnsClient.printHexDump(receive1.getData());
-
-
-
-//        clientSocket.receive(receive1);
-////////////////////
-        String newSentence = new String(receive1.getData());
-
-        System.out.println("Server says: " + newSentence);
-        clientSocket.close();
-
-    }
+	}
 }
