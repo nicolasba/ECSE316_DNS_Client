@@ -44,7 +44,7 @@ public class DnsPacket {
 
 	/************************** PACKET HEADER **************************/
 
-	 class DnsPacketHeader {
+	class DnsPacketHeader {
 
 		ByteBuffer buffer;
 
@@ -133,7 +133,7 @@ public class DnsPacket {
 
 	/************************** PACKET QUESTION SECTION **************************/
 
-	 class DnsPacketQuestion {
+	class DnsPacketQuestion {
 
 		ByteBuffer buffer;
 
@@ -196,7 +196,7 @@ public class DnsPacket {
 
 	/**************** PACKET ANSWER (ANS/AUTH/ADD) SECTION ****************/
 
-	 class DnsPacketAnswer {
+	class DnsPacketAnswer {
 
 		ByteBuffer buffer;
 		int nbRecords; // # of RRs in this answer
@@ -323,7 +323,7 @@ public class DnsPacket {
 		}
 	}
 
-	 class DnsPacketAnswerRR {
+	class DnsPacketAnswerRR {
 
 		String NAME = ""; // Domain name associated with RR
 		int TYPE = 0; // Type of data in RDATA (0x1 typeA, 0x0002 NS, 0x0005 CNAME, 0x000f MX)
@@ -341,4 +341,6 @@ public class DnsPacket {
 		String EXCHANGE = ""; // Domain name of mail server (as sequence of labels)
 
 	}
+	 
+	
 }

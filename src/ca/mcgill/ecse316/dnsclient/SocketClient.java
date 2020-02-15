@@ -13,16 +13,18 @@ public class SocketClient {
 		InetAddress dnsServerIPAddr = InetAddress.getByAddress(dnsServerAddrBytes);
 
 		clientSocket.setSoTimeout(timeout * 1000);		//Set timeout in ms
-		System.out.println("dns server ip addr: " + dnsServerIPAddr);
+//		System.out.println("dns server ip addr: " + dnsServerIPAddr);
 
 		DatagramPacket requestPacket = new DatagramPacket(sendData, sendData.length, dnsServerIPAddr, port);
 		clientSocket.send(requestPacket);
 
+		responseTime = System.currentTimeMillis();
 		DatagramPacket responsePacket = new DatagramPacket(receiveData, receiveData.length);
 		clientSocket.receive(responsePacket);
+		responseTime = (System.currentTimeMillis() - responseTime) / 1000.0;
 
-		System.out.println("hello " + responsePacket.getAddress());
-		System.out.println("Server says: " + new String(responsePacket.getData()));
+//		System.out.println("hello " + responsePacket.getAddress());
+//		System.out.println("Server says: " + new String(responsePacket.getData()));
 		
 		clientSocket.close();
 		return responsePacket.getData();

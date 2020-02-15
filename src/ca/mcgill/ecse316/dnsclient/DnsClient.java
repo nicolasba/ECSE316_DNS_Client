@@ -2,6 +2,7 @@ package ca.mcgill.ecse316.dnsclient;
 
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import ca.mcgill.ecse316.dnsclient.DnsPacket.DnsPacketAnswer;
 
 public class DnsClient {
 
@@ -19,6 +20,7 @@ public class DnsClient {
 	static String domName; // Domain name to query for
 	static String[] domNameLabels;
 
+	static double responseTime;
 	static int nbAttempts; // Keep track of the # of request attempts
 	static boolean didReceive = false;
 
@@ -29,13 +31,20 @@ public class DnsClient {
 		domName = "";
 		byte[] responseData = new byte[1024];
 
+		// Parse user input
 		try {
-			DnsParser.parse(args); // Parse user input
+			DnsParser.parse(args);
 		} catch (Exception e) {
 			System.out.println("ERROR\t" + e.getMessage());
 			System.exit(1);
 		}
 
+		System.out.println("DnsClient sending request for " + domName);
+		System.out.println("Server: " + dnsServerAddr);
+		System.out.println("Request type: " + queryType.name());
+		System.out.println();
+
+		// Send packets as long as there is no response and max retries are not exceeded
 		for (nbAttempts = 0; nbAttempts < maxRetries && !didReceive; nbAttempts++) {
 
 			System.out.println("Attempt " + (nbAttempts + 1) + " out of " + maxRetries);
@@ -44,12 +53,12 @@ public class DnsClient {
 			try {
 				requestPacket = new DnsPacket();
 				responseData = SocketClient.sendPacket(requestPacket.message);
-				responsePacket = new DnsPacket(ByteBuffer.wrap(responseData));	//Will throw exception if no response
-				didReceive = true;		//If we get to this point, we received a response
+				responsePacket = new DnsPacket(ByteBuffer.wrap(responseData)); // Will throw exception if no response
+				didReceive = true; // If we get to this point, we received a response
 			} catch (SocketTimeoutException timeoutEx) {
 
 				if (nbAttempts + 1 == maxRetries) {
-					System.out.println("ERROR Server not responding");
+					System.out.println("ERROR	No response: Maximum number of retries [" + maxRetries + "] exceeded");
 					System.exit(1);
 				}
 
@@ -60,12 +69,42 @@ public class DnsClient {
 
 		}
 
+		String attempts = (nbAttempts < 2) ? "attempt" : "attempts";
+		System.out.printf("Response received after %.2f seconds (" + nbAttempts + " " + attempts + ")\n", responseTime);
+		System.out.println();
+
+		// RA : Print error if server can't recurse queries
+		if (responsePacket.header.RA == 0)
+			System.out.println("ERROR\t This server does not support recursive queries");
+
+		// RCODE: Errors
+		switch (responsePacket.header.RCODE) {
+		case 0x1:
+			System.out.println("ERROR\t Name server was unable to interpret the query");
+			break;
+		case 0x2:
+			System.out.println("ERROR\t Server failure");
+			break;
+		case 0x3:
+			System.out.println("ERROR\t Domain name referenced in the query does not exist");
+			break;
+		case 0x4:
+			System.out.println("ERROR\t Name server does not support the requested kind of query");
+			break;
+		case 0x5:
+			System.out.println("ERROR\t Name server refuses to perform the requested operation for policy reasons");
+			break;
+		}
+
+		printAnswerContent(responsePacket.answer, "Answer");
+		printAnswerContent(responsePacket.additional, "Additional");
+
 		System.out.println("\nHex dump request packet:");
 		printHexDump(requestPacket.message);
 
 		System.out.println("\nHex dump response packet:");
 		printHexDump(responseData);
-		
+
 		System.out.println("timeout : " + timeout);
 		System.out.println("max retries : " + maxRetries);
 		System.out.println("port : " + port);
@@ -130,11 +169,50 @@ public class DnsClient {
 			System.out.println("EXCHANGE: " + responsePacket.additional.rrs[i].EXCHANGE);
 			System.out.println();
 		}
-		
-		// Successful output
-//		System.out.println("DnsClient sending request for " + domName);
-//		System.out.println("Server: " + dnsServerAddr);
-//		System.out.println("Request type: " + queryType.name());
+	}
+
+	public static void printAnswerContent(DnsPacketAnswer answer, String s) {
+
+		int nbRecords = 0;
+
+		if (s.equals("Answer"))
+			nbRecords = responsePacket.header.ANCOUNT;
+		else if (s.equals("Additional"))
+			nbRecords = responsePacket.header.ARCOUNT;
+
+		// Answer records
+		System.out.println("*** " + s + " Section (" + nbRecords + " records) ***");
+
+		for (int i = 0; i < nbRecords; i++) {
+
+			switch (answer.rrs[i].TYPE) {
+			case 0x0001:
+				System.out.print("IP\t" + answer.rrs[i].RDATA + "\t");
+				break;
+			case 0x0002:
+				System.out.print("NS\t" + answer.rrs[i].RDATA + "\t");
+				break;
+			case 0x0005:
+				System.out.print("CNAME\t" + answer.rrs[i].RDATA + "\t");
+				break;
+			case 0x000f:
+				System.out.print("MX\t" + answer.rrs[i].EXCHANGE + "\t\t" + answer.rrs[i].PREFERENCE + "\t");
+				break;
+			}
+
+			// Seconds can cache
+			System.out.print(answer.rrs[i].TTL + "s\t");
+
+			// Auth/nonauth
+			if (responsePacket.header.AA == 0x1)
+				System.out.println("auth");
+			else
+				System.out.println("nonauth");
+		}
+
+		if (nbRecords == 0)
+			System.out.println("NOT FOUND");
+		System.out.println();
 	}
 
 	public static void printHexDump(byte[] data) {
