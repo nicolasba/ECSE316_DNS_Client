@@ -1,7 +1,6 @@
 package ca.mcgill.ecse316.dnsclient;
 
 import java.net.*;
-import static ca.mcgill.ecse316.dnsclient.DnsClient.*;
 
 public class SocketClient {
 
@@ -10,18 +9,18 @@ public class SocketClient {
 		byte[] receiveData = new byte[1024];
 
 		DatagramSocket clientSocket = new DatagramSocket();
-		InetAddress dnsServerIPAddr = InetAddress.getByAddress(dnsServerAddrBytes);
+		InetAddress dnsServerIPAddr = InetAddress.getByAddress(DnsClient.dnsServerAddrBytes);
 
-		clientSocket.setSoTimeout(timeout * 1000);		//Set timeout in ms
+		clientSocket.setSoTimeout(DnsClient.timeout * 1000);		//Set timeout in ms
 //		System.out.println("dns server ip addr: " + dnsServerIPAddr);
 
-		DatagramPacket requestPacket = new DatagramPacket(sendData, sendData.length, dnsServerIPAddr, port);
+		DatagramPacket requestPacket = new DatagramPacket(sendData, sendData.length, dnsServerIPAddr, DnsClient.port);
 		clientSocket.send(requestPacket);
 
-		responseTime = System.currentTimeMillis();
+		DnsClient.responseTime = System.currentTimeMillis();
 		DatagramPacket responsePacket = new DatagramPacket(receiveData, receiveData.length);
 		clientSocket.receive(responsePacket);
-		responseTime = (System.currentTimeMillis() - responseTime) / 1000.0;
+		DnsClient.responseTime = (System.currentTimeMillis() - DnsClient.responseTime) / 1000.0;
 
 //		System.out.println("hello " + responsePacket.getAddress());
 //		System.out.println("Server says: " + new String(responsePacket.getData()));
