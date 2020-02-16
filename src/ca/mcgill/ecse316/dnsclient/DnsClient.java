@@ -53,6 +53,7 @@ public class DnsClient {
 			try {
 				requestPacket = new DnsPacket();
 				responseData = SocketClient.sendPacket(requestPacket.message);
+				printHexDump(responseData);
 				responsePacket = new DnsPacket(ByteBuffer.wrap(responseData)); // Will throw exception if no response
 				didReceive = true; // If we get to this point, we received a response
 			} catch (SocketTimeoutException timeoutEx) {
@@ -80,21 +81,24 @@ public class DnsClient {
 		// RCODE: Errors
 		switch (responsePacket.header.RCODE) {
 		case 0x1:
-			System.out.println("ERROR\t Name server was unable to interpret the query");
+			System.out.print("ERROR\t Name server was unable to interpret the query");
 			break;
 		case 0x2:
-			System.out.println("ERROR\t Server failure");
+			System.out.print("ERROR\t Server failure");
 			break;
 		case 0x3:
-			System.out.println("ERROR\t Domain name referenced in the query does not exist");
+			System.out.print("ERROR\t Domain name referenced in the query does not exist");
 			break;
 		case 0x4:
-			System.out.println("ERROR\t Name server does not support the request kind of query");
+			System.out.print("ERROR\t Name server does not support the request kind of query");
 			break;
 		case 0x5:
-			System.out.println("ERROR\t Name server refuses to perform the requested operation for policy reasons");
+			System.out.print("ERROR\t Name server refuses to perform the requested operation for policy reasons");
 			break;
 		}
+
+		if (responsePacket.header.RCODE != 0)
+			System.out.println(":\tRCODE = " + responsePacket.header.RCODE);
 
 		printAnswerContent(responsePacket.answer, "Answer");
 		printAnswerContent(responsePacket.additional, "Additional");
@@ -103,6 +107,7 @@ public class DnsClient {
 	public static void printAnswerContent(DnsPacketAnswer answer, String s) {
 
 		int nbRecords = 0;
+		boolean unsupportedType = false;
 
 		if (s.equals("Answer"))
 			nbRecords = responsePacket.header.ANCOUNT;
@@ -113,6 +118,8 @@ public class DnsClient {
 		System.out.println("*** " + s + " Section (" + nbRecords + " records) ***");
 
 		for (int i = 0; i < nbRecords; i++) {
+
+			unsupportedType = false;
 
 			switch (answer.rrs[i].TYPE) {
 			case 0x0001:
@@ -127,16 +134,23 @@ public class DnsClient {
 			case 0x000f:
 				System.out.print("MX\t" + answer.rrs[i].EXCHANGE + "\t\t" + answer.rrs[i].PREFERENCE + "\t");
 				break;
+			default:
+				System.out.print("ERROR\tResource record with unsupported type: ");
+				System.out.println(String.format("0x%02X ", answer.rrs[i].TYPE));
+				unsupportedType = true;
 			}
 
-			// Seconds can cache
-			System.out.print(answer.rrs[i].TTL + "s\t");
+			//Only print the following for supported type responses
+			if (!unsupportedType) {
+				// Seconds can cache
+				System.out.print(answer.rrs[i].TTL + "s\t");
 
-			// Auth/nonauth
-			if (responsePacket.header.AA == 0x1)
-				System.out.println("auth");
-			else
-				System.out.println("nonauth");
+				// Auth/nonauth
+				if (responsePacket.header.AA == 0x1)
+					System.out.println("auth");
+				else
+					System.out.println("nonauth");
+			}
 		}
 
 		if (nbRecords == 0)
@@ -149,10 +163,22 @@ public class DnsClient {
 		System.out.println("-------------");
 		System.out.println("Hex dump :");
 		for (int i = 0; i < data.length; i++) {
+
+			if (i % 10 == 0)
+				System.out.print(i + ": ");
+
 			System.out.print(String.format("0x%02X ", data[i]));
 
-			if ((i + 1) % 10 == 0)
+			if ((i + 1) % 10 == 0) {
+
+				System.out.print("\t");
+
+				for (int j = i - 9; j < i + 1; j++) {
+					System.out.print((char) data[j]);
+				}
+				
 				System.out.println();
+			}
 		}
 		System.out.println();
 		System.out.println("-------------");

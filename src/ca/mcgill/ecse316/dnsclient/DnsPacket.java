@@ -215,7 +215,7 @@ public class DnsPacket {
 				nbRecords = header.ARCOUNT; // # of RRs in Additional
 
 			rrs = new DnsPacketAnswerRR[nbRecords];
-			
+
 			for (int i = 0; i < nbRecords; i++) {
 
 				rrs[i] = new DnsPacketAnswerRR();
@@ -247,6 +247,9 @@ public class DnsPacket {
 					rrs[i].PREFERENCE += response.getChar();
 					parseLabels(response, rrs[i], "EXCHANGE");
 				}
+				else {		//Any other type is not supported
+					buffer.get(new byte[rrs[i].RDLENGTH]); 	//Ignore the data in the RDATA section
+				}
 			}
 		}
 
@@ -259,25 +262,30 @@ public class DnsPacket {
 
 			// As long as we haven't encountered 0x0, we have to keep reading labels
 			while (nbLabelChars != 0) {
+
+//				int two_most_sig_bits = Byte.toUnsignedInt(nbLabelChars) >>> 6;
 				
-				//Found compression pointer
+				// Found compression pointer
 				if (nbLabelChars < 0) {
+//				if (two_most_sig_bits == 3) {
 					
-					//Go back 1 byte to read 2 bytes containing the offset
-					response.position(response.position() - 1); 
-					
+					// Go back 1 byte to read 2 bytes containing the offset
+					response.position(response.position() - 1);
+
 					int offset = response.getChar();
-					offset = offset & 0x3FFF;		//Only consider the last 14 bits from the 2 bytes
-					
-					//Keep track of position after pointer (only after the first pointer encountered, 
-					//there can be nested pointers)
+					offset = offset & 0x3FFF; // Only consider the last 14 bits from the 2 bytes
+
+					// Keep track of position after pointer (only after the first pointer
+					// encountered,
+					// there can be nested pointers)
 					if (!foundPointer)
-						positionAfterPointer = response.position(); 
-					
+						positionAfterPointer = response.position();
+
 					foundPointer = true;
-					
-					response.position(offset);	//Reposition the buffer to the offset
+
+					response.position(offset); // Reposition the buffer to the offset
 					nbLabelChars = response.get();
+					continue;
 				}
 
 				byte[] labelBytes = new byte[nbLabelChars];
@@ -303,21 +311,23 @@ public class DnsPacket {
 
 				nbLabelChars = response.get();
 			}
-			
+
 			if (foundPointer)
 				response.position(positionAfterPointer);
 
 			// Remove last '.'
-			switch (s) {
-			case "NAME":
-				rr.NAME = rr.NAME.substring(0, rr.NAME.length() - 1);
-				break;
-			case "RDATA":
-				rr.RDATA = rr.RDATA.substring(0, rr.RDATA.length() - 1);
-				break;
-			case "EXCHANGE":
-				rr.EXCHANGE = rr.EXCHANGE.substring(0, rr.EXCHANGE.length() - 1);
-				break;
+			if (s.length() > 0) {
+				switch (s) {
+				case "NAME":
+					rr.NAME = rr.NAME.substring(0, rr.NAME.length() - 1);
+					break;
+				case "RDATA":
+					rr.RDATA = rr.RDATA.substring(0, rr.RDATA.length() - 1);
+					break;
+				case "EXCHANGE":
+					rr.EXCHANGE = rr.EXCHANGE.substring(0, rr.EXCHANGE.length() - 1);
+					break;
+				}
 			}
 
 		}
@@ -341,6 +351,5 @@ public class DnsPacket {
 		String EXCHANGE = ""; // Domain name of mail server (as sequence of labels)
 
 	}
-	 
-	
+
 }
